@@ -1,0 +1,119 @@
+This assignment makes use of data from a personal activity monitoring
+device. This device collects data at 5 minute intervals through out the
+day. The data consists of two months of data from an anonymous
+individual collected during the months of October and November, 2012 and
+include the number of steps taken in 5 minute intervals each day.
+
+#### Loading and preprocessing the data
+
+    if(!file.exists("activity.csv")){
+      unzip("repdata-data-activity.zip")
+    }
+    MyData = read.csv("activity.csv")
+    MyData2 = MyData
+    MyData2$steps[is.na(MyData2$steps)] = 0
+    MyDataProcessed = MyData[!is.na(MyData$steps),]
+    MyDataProcessed$time = strftime(as.POSIXct(formatC(MyDataProcessed$interval, width = 4,format = "d", flag= "0"), format='%H%M'), format='%H:%M:%S')
+
+#### 1. What is mean total number of steps taken per day?
+
+###### 1.a. Calculate the total number of steps taken per day
+
+    if(require("doBy") == FALSE) {install.packages("doBy")}
+    library(doBy)
+    TotalStepsdf = summaryBy(steps ~ date, data = MyDataProcessed, 
+              FUN = list(sum))
+    TotalStepsdf2 = summaryBy(steps ~ date, data = MyData2, 
+              FUN = list(sum))
+
+###### 1.b. Make a histogram of the total number of steps taken each day
+
+    hist(TotalStepsdf$steps.sum, ylab = "Frequency", xlab = "Total Steps per Day", breaks = 25, col = "black", border = "white", main = "Frequency by Total Steps per Day")
+
+Figure 1 shows the historgram of Frequency by Total Steps per Day
+
+###### 1.c. Calculate and report the mean and median of the total number of steps taken per day
+
+    Mean_steps = format(mean(TotalStepsdf$steps.sum), digits = 2, nsmall = 2)
+    Median_steps = format(median(TotalStepsdf$steps.sum), digits = 2)
+    Mean_steps2 = format(mean(TotalStepsdf2$steps.sum), digits = 2, nsmall =2)
+    Median_steps2 = format(median(TotalStepsdf2$steps.sum), digits = 2)
+
+The mean steps if records with NA values are removed is 10766.19. The
+median steps if records with NA values are removed is 10765. The mean
+steps if NA values are converted to 0 is 9354.23. The median steps if NA
+values are converted to 0 is 10395.
+
+#### 2. What is the average daily activity pattern?
+
+###### 2.a. Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+
+    if(require("ggplot2") == FALSE) {install.packages("ggplot2")}
+    library(ggplot2)
+    Total_Aggregates_Subset = aggregate(steps ~ interval, MyDataProcessed, mean) 
+    gg_avgsteps = ggplot(Total_Aggregates_Subset, aes(interval, steps)) +geom_line()  +xlab("Interval")+ylab(
+      "Average Number of Steps Taken Across All Days")+ggtitle(
+        label ="Average Number of Steps Taken by Interval" )
+    print(gg_avgsteps)
+
+Figure 2 shows the Average Number of Steps Taken by Interval.
+
+###### 2.b. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+    Total_Aggregates_Subset2 = aggregate(steps ~ time, MyDataProcessed, mean) 
+    Max_Value = max(Total_Aggregates_Subset2$steps)
+    Time_Value = Total_Aggregates_Subset2$time[Total_Aggregates_Subset2$steps == Max_Value]
+
+The time in which the maximum average number of steps across all days is
+taken is 08:35:00
+
+#### 3. Imputing missing values
+
+###### 3.a. Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+
+    MissingDays = length(which(is.na(MyData$steps)))
+
+Total number of missing data is 2304
+
+###### 3.b. Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+
+    MyData3 = MyData
+    Mean_steps3 =  aggregate(steps ~ interval, MyDataProcessed, mean) 
+    names(Mean_steps3) = c("interval", "steps_mean")
+    Total_Data = merge(MyData3,Mean_steps3,by = "interval")
+     Total_Data$steps_mean = format(Total_Data$steps_mean, digits = 0, nsmall = 0)
+    Total_Data$steps[is.na(Total_Data$steps)] = Total_Data$steps_mean
+    Total_Data$steps = as.numeric(Total_Data$steps)
+
+###### 3.c. Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+    TotalStepsdf3 =  summaryBy(steps ~ date, data = Total_Data, 
+              FUN = list(sum))
+    Mean_steps3 = format(mean(TotalStepsdf3$steps.sum), digits = 2, nsmall = 2)
+    Median_steps3 = format(median(TotalStepsdf3$steps.sum), digits = 2)
+    hist(TotalStepsdf3$steps.sum, ylab = "Frequency", xlab = "Total Steps per Day", breaks = 25, col = "black", border = "white", main = "Frequency by Total Steps per Day")
+
+Figure 3 shows Frequency by Total Steps per Day for the imputted
+dataset.
+
+The mean for the imputed dataset is 9369.23. The median for the imputed
+dataset is 10395. The mean and median differ between the imputed dataset
+and non-imputd dataset.
+
+#### 4. Are there differences in activity patterns between weekdays and weekends?
+
+###### 4.a. Create a new factor variable in the dataset with two levels - "weekday" and "weekend" indicating whether a given date is a weekday or weekend day.
+
+    Total_Data$date = as.Date(Total_Data$date)
+    Total_Data$weekday =  weekdays(Total_Data$date)
+    Total_Data$Is.Weekday = ifelse(Total_Data$weekday %in% c("Monday" ,"Tuesday","Wednesday",  "Thursday", "Friday"), "Weekday", "Weekend")
+
+###### 4.b. Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). See the README file in the GitHub repository to see an example of what this plot should look like using simulated data.
+
+    Total_Aggregates_Subset4 <- aggregate(steps ~ interval + Is.Weekday, Total_Data, mean) 
+    gg_weekdays = ggplot(Total_Aggregates_Subset4, aes(interval, steps, color = Is.Weekday)) +geom_line()  +xlab("Interval")+ylab(
+      "Mean Steps Taken Across All Days")+ggtitle(
+        label ="Mean Steps by Interval and Weekdays" )+facet_grid(Is.Weekday~., scales ="free")+ theme(legend.position='none')
+    print(gg_weekdays)
+
+Figure 4 shows Mean Steps by Interval and Weekdays.
